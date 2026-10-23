@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#14213d">
+<title>美股台指早報</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+/* 台灣習慣：漲紅跌綠 */
+:root{--bg:#f4f6f9;--card:#fff;--text:#1b2430;--sub:#5f6b7a;--line:#e1e5eb;--head:#14213d;--up:#d32f2f;--down:#1b8a3c;--flat:#5f6b7a}
+@media (prefers-color-scheme:dark){:root{--bg:#0f141b;--card:#1a212b;--text:#e8edf3;--sub:#9aa6b4;--line:#2b3440;--head:#0b1426;--up:#ff6b6b;--down:#4cc976;--flat:#9aa6b4}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Noto Sans TC","Microsoft JhengHei",sans-serif;-webkit-tap-highlight-color:transparent}
+header{display:flex;align-items:center;gap:8px;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top));background:var(--head);color:#fff}
+header h1{font-size:18px;margin:0;flex:1}
+header button{background:rgba(255,255,255,.16);color:#fff;border:0;border-radius:10px;padding:8px 12px;font-size:15px}
+main{max-width:640px;margin:0 auto;padding:4px 16px calc(24px + env(safe-area-inset-bottom))}
+h2{font-size:14px;color:var(--sub);font-weight:600;margin:18px 2px 8px}
+#status{font-size:13px;color:var(--sub);margin:10px 2px 0}
+#status.err{color:var(--up)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:8px;display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center}
+.card .nm{font-size:15px;font-weight:600}
+.card .tm{font-size:12px;color:var(--sub)}
+.card .px{font-size:22px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.card .ch{font-size:14px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+.card svg{grid-column:1/-1;width:100%;height:36px;margin-top:6px}
+.card.big .px{font-size:28px}
+.meta{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--sub);margin-top:6px;font-variant-numeric:tabular-nums}
+.meta b{color:var(--text);font-weight:600}
+.up{color:var(--up)}.down{color:var(--down)}.flat{color:var(--flat)}
+.badge{display:inline-block;font-size:11px;border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:2px;background:var(--line);color:var(--sub);font-weight:500}
+.badge.live{background:var(--up);color:#fff}
+footer{font-size:12px;color:var(--sub);margin-top:18px;line-height:1.6}
+</style>
+</head>
+<body>
+<header><h1>美股台指早報</h1><button id="reload">重新整理</button></header>
+<main>
+  <div id="status">載入中…</div>
+  <h2>台指期夜盤（近月）</h2>
+  <div id="tw"></div>
+  <h2>美股指數</h2>
+  <div id="us"></div>
+  <footer>資料來源：Yahoo Finance（美股）、臺灣期貨交易所（台指期）。後台每小時自動更新一次，非即時報價，僅供參考。<br>顏色採台灣習慣：紅漲、綠跌。</footer>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const fmt = (n, d = 2) => n == null ? '—' : Number(n).toLocaleString('en-US', {minimumFractionDigits: d, maximumFractionDigits: d});
+const cls = n => n > 0 ? 'up' : n < 0 ? 'down' : 'flat';
+const sign = n => n > 0 ? '▲' : n < 0 ? '▼' : '';
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function spark(arr) {
+  if (!arr || arr.length < 2) return '';
+  const lo = Math.min(...arr), hi = Math.max(...arr), w = 300, h = 36, r = hi - lo || 1;
+  const pts = arr.map((v, i) => `${(i / (arr.length - 1) * w).toFixed(1)},${(h - 3 - (v - lo) / r * (h - 6)).toFixed(1)}`).join(' ');
+  const c = arr[arr.length - 1] >= arr[0] ? 'var(--up)' : 'var(--down)';
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="近一個月走勢"><polyline points="${pts}" fill="none" stroke="${c}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
+}
+
+// 夜盤 15:00–隔日 05:00（台北時間）；資料要是這一場夜盤的才算交易中（休市日不會亮）
+function nightLive(date) {
+  const t = new Date(Date.now() + 8 * 3600e3), h = t.getUTCHours();
+  if (h >= 5 && h < 15) return false;
+  if (h < 5) t.setUTCDate(t.getUTCDate() - 1);
+  return t.toISOString().slice(0, 10) === date;
+}
+
+function render(d) {
+  const n = d.tw && d.tw.night, day = d.tw && d.tw.day;
+  if (n) {
+    const live = nightLive(n.date);
+    $('#tw').innerHTML = `<div class="card big">
+      <div><div class="nm">${esc(n.name)}<span class="badge ${live ? 'live' : ''}">${live ? '交易中' : '已收盤'}</span></div>
+      <div class="tm">${esc(n.date)} 夜盤・最後成交 ${esc(n.time)}</div></div>
+      <div><div class="px ${cls(n.change)}">${fmt(n.last, 0)}</div><div class="ch ${cls(n.change)}">${sign(n.change)} ${fmt(Math.abs(n.change), 0)}（${fmt(n.pct)}%）</div></div>
+      <div class="meta"><span>開 <b>${fmt(n.open, 0)}</b></span><span>高 <b>${fmt(n.high, 0)}</b></span><span>低 <b>${fmt(n.low, 0)}</b></span><span>量 <b>${fmt(n.volume, 0)}</b> 口</span><span>參考價 <b>${fmt(n.ref, 0)}</b></span>${day ? `<span>日盤收 <b>${fmt(day.last, 0)}</b>（${esc(day.date)}）</span>` : ''}</div>
+    </div>`;
+  } else $('#tw').innerHTML = '<div class="card"><div class="nm">暫時拿不到台指期資料</div></div>';
+
+  $('#us').innerHTML = (d.us || []).map(x => `<div class="card">
+      <div><div class="nm">${esc(x.name)}</div><div class="tm">台北時間 ${esc(x.time)}</div></div>
+      <div><div class="px ${cls(x.change)}">${fmt(x.last)}</div><div class="ch ${cls(x.change)}">${sign(x.change)} ${fmt(Math.abs(x.change))}（${fmt(x.pct)}%）</div></div>
+      ${spark(x.spark)}
+    </div>`).join('') || '<div class="card"><div class="nm">暫時拿不到美股資料</div></div>';
+
+  const st = $('#status');
+  st.className = d.errors && d.errors.length ? 'err' : '';
+  st.textContent = `資料更新於 ${d.updated}（台北時間）` + (d.errors && d.errors.length ? `，部分資料抓取失敗` : '');
+}
+
+async function load() {
+  $('#status').textContent = '載入中…';
+  try {
+    const r = await fetch('data.json?t=' + Date.now(), {cache: 'no-store'});
+    if (!r.ok) throw new Error(r.status);
+    render(await r.json());
+  } catch (e) {
+    const c = await caches.match('data.json').catch(() => null);
+    if (c) { render(await c.json()); $('#status').textContent += '（離線，顯示上次資料）'; }
+    else { $('#status').className = 'err'; $('#status').textContent = '載入失敗，請確認網路後再試'; }
+  }
+}
+$('#reload').onclick = load;
+document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+load();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
