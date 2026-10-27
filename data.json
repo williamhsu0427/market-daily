@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-27 06:33",
+ "updated": "2026-10-27 08:35",
  "us": [
   {
    "symbol": "^DJI",
@@ -153,14 +153,14 @@
    "name": "臺指期116",
    "contract": "TXFK6-F",
    "last": null,
-   "ref": null,
-   "change": null,
-   "pct": null,
+   "ref": 46234.0,
+   "change": 0.0,
+   "pct": 0.0,
    "open": null,
    "high": null,
    "low": null,
    "volume": 0,
-   "date": "--",
+   "date": "2026-10-27",
    "time": "00:00"
   }
  },
