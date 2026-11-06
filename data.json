@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-06 08:00",
+ "updated": "2026-11-06 09:39",
  "us": [
   {
    "symbol": "^DJI",
@@ -156,16 +156,16 @@
   "day": {
    "name": "臺指期116",
    "contract": "TXFK6-F",
-   "last": null,
+   "last": 38397.0,
    "ref": 41882.0,
-   "change": 0.0,
-   "pct": 0.0,
-   "open": null,
-   "high": null,
-   "low": null,
-   "volume": 0,
+   "change": -3485.0,
+   "pct": -8.32,
+   "open": 38888.0,
+   "high": 39000.0,
+   "low": 37694.0,
+   "volume": 37286,
    "date": "2026-11-06",
-   "time": "00:00"
+   "time": "09:39"
   }
  },
  "errors": []
